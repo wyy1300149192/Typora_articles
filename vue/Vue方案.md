@@ -1,3 +1,5 @@
+# Vue2案例
+
 ## npm 对应 yarn 命令
 
 ![](https://yang-cloud-img.oss-cn-beijing.aliyuncs.com/img/1658992332839.png)
@@ -614,3 +616,89 @@ Vue.use(Components);
          return year + (month < 10 ? '0' + month : month) + (date < 10 ? '0' + date : date)
        }
    ```
+
+# Vue3案例
+
+## 目录解析
+
+![01](https://yang-cloud-img.oss-cn-beijing.aliyuncs.com/img/01.png)
+
+## Vuex持久化
+
+利用`vuex-persistedstate`插件实现vuex数据持久化，将数据存入localStorage中
+
+**实现步骤**
+
+1. **安装**
+
+   ```cmd
+   npm i vuex-persistedstate
+   ```
+
+2. **vuex的plugins配置中使用createPersistedstate函数**
+
+   * key： localStorage键名
+
+   * paths： 需要存入state中的那些数据
+
+   ```js
+   import { createStore } from 'vuex'
+   import createPersistedstate from 'vuex-persistedstate'
+   
+   export default createStore({
+     plugins: [
+       createPersistedstate({
+         // key localStorage键名
+         key: 'erabbit-client-pc-store',
+         // paths 需要存入state中的那些数据
+         paths: ['user', 'cart']
+       })
+     ]
+   })
+   ```
+
+## Logger Plugin(vue3的vuex调试)
+
+在vue3中vue2中的调试工具已不支持当前查看，需要我们使用`Logger Plugin`调试
+
+Logger Plugin为vuex内置的一个模块，只需要引入并且注册为插件即可
+
+```js
+import { createStore, createLogger } from 'vuex'
+export default createStore({
+  plugins: [
+    createLogger()
+  ]
+})
+```
+
+安装好这个插件后，每次触发action函数和mutation函数，都自动在控制台打印出提交记录与详细信息，包括`名称` `参数` `修改前后的state数据`
+
+![image-20220801175511077](https://yang-cloud-img.oss-cn-beijing.aliyuncs.com/img/image-20220801175511077.png)
+
+## style的自动化导入
+
+## 全局组件封装
+
+components/index.js 统一注册组件
+
+```js
+// 引入组件
+import Skeleton from './Skeleton'
+
+// 导出install方法 注册组件
+export default {
+  install (app) {
+    app.component(Skeleton.name, Skeleton)
+  }
+}
+```
+
+main.js 入口文件`vue实例`应用组件
+
+```js
+import componentPlugin from '@/components'
+// use应用组件
+createApp(App).use(store).use(router).use(componentPlugin).mount('#app')
+```
+
