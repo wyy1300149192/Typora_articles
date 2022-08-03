@@ -678,6 +678,34 @@ export default createStore({
 
 ## style的自动化导入
 
+> 使用vue-cli的style-resoures-loader 插件完成自动注入到每个vue组件的style标签，避免在每个样式文件中手动的@import导入
+
+1） 执行命令`vue add style-resources-loader`
+
+2）安装完成后`vue.config.js`中自动添加配置
+
+```js
+module.exports = {
+  pluginOptions: {
+    'style-resources-loader': {
+      preProcessor: 'less',
+      patterns: []
+    }
+  }
+}
+```
+
+2）在patterns数组中配置需要导入的style
+
+```js
+patterns: [
+        // 配置哪些文件需要自动导入
+path.join(__dirname,'./src/styles/variables.less')
+      ]
+```
+
+
+
 ## 全局组件封装
 
 components/index.js 统一注册组件
@@ -700,5 +728,374 @@ main.js 入口文件`vue实例`应用组件
 import componentPlugin from '@/components'
 // use应用组件
 createApp(App).use(store).use(router).use(componentPlugin).mount('#app')
+```
+
+## 全局自定义指令封装
+
+`@/directives/index.js`
+
+```js
+export default {
+  install (app) {
+    app.directive('指令名', {
+      // el为绑定该指令的dom
+      // binding可以获得该指令的值
+      mounted (el, binding) {
+		// 执行
+      }
+    })
+  }
+}
+
+```
+
+vue注册
+
+```js
+import directivePlugin from '@/directives'
+
+createApp(App).use(directivePlugin)
+```
+
+
+
+## vueuse/core工具库
+
+> VueUse是基于[Composion API](https://v3.vuejs.org/guide/composition-api-introduction.html)的实用程序函数的集合。
+
+**安装**
+
+```cmd
+npm i @vueuse/core
+```
+
+### 监听滚动获得滚动距离
+
+利用`useWindowScroll`方法监听滚动距离
+
+```html
+<script>
+import HeaderNav from './header-nav'
+import { useWindowScroll } from '@vueuse/core'
+export default {
+  name: 'AppHeaderSticky',
+  components: { HeaderNav },
+  setup () {
+    // y表示具体顶部的滚动距离 会动态更新
+    const { y } = useWindowScroll()
+    return { y }
+  }
+}
+</script>
+```
+
+### ⭐组件数据懒加载
+
+> 电商项目的核心优化手段：组件数据懒加载
+>
+> 说明：电商项目大多数据很多，默认就加载一个页面的所有数据，必然会发送很多不需要的请求
+>
+> 解决方案：`等所在模块进入 可视区 再获取数据`
+
+**方案**：
+
+我们可以使用 `@vueuse/core` 中的 `useIntersectionObserver`方法 来实现监听组件进入可视区域行为
+
+**实现**：
+
+封装公共方法
+
+判断处于可视区域时才执行请求函数
+
+利用stop函数避免重复执行请求函数
+
+```js
+import { ref } from 'vue'
+import { useIntersectionObserver } from '@vueuse/core'
+
+export function useObserver (apiFunc) {
+  // target为绑定的dom节点
+  const target = ref(null)
+  const { stop } = useIntersectionObserver(
+    target,
+    // isIntersecting为是否处于可视区域 返回一个布尔值
+    ([{ isIntersecting }], observerElement) => {
+      // 判断如果处于可视区域执行api函数
+      if (isIntersecting) {
+        apiFunc()
+        // 停止监听
+        stop()
+      }
+    }
+  )
+  // 返回一个target
+  return target
+}
+
+```
+
+### ⭐图片懒加载
+
+> 电商类项目图片非常多，可以做一下图片的懒加载
+
+**方案**：利用自定义指令与vueuse/core工具库 监测在可视距离后再给img的src赋值
+
+```js
+import { useIntersectionObserver } from '@vueuse/core'
+
+export default {
+  install (app) {
+    //定义自定义指令名 imgLazy
+    app.directive('imgLazy', {
+      mounted (el, binding) {
+        const { stop } = useIntersectionObserver(
+          el,
+          ([{ isIntersecting }], observerElement) => {
+            if (isIntersecting) {
+              // 监测在可视区域后再将img标签src赋值
+              el.src = binding.value
+              stop()
+            }
+          }
+        )
+      }
+    })
+  }
+}
+```
+
+**使用**
+
+```html
+<img v-imgLazy='item.picture' alt="">
+```
+
+
+
+## 骨架组件业务使用
+
+> 当页面数据还未获取到时，利用骨架组件进行占位，提升用户体验
+
+1）定义公共骨架组件
+
+组件接收三个值： 宽 、高 、背景色
+
+```vue
+<template>
+  <!-- 决定组件的宽高 -->
+  <div
+    class="xtx-skeleton shan"
+    :style="{ width: width + 'px', height: height + 'px' }"
+  >
+    <!-- 决定组件的背景色 -->
+    <div class="block" :style="{ backgroundColor: bg }"></div>
+  </div>
+</template>
+<script>
+export default {
+  name: 'XtxSkeleton',
+  props: {
+    // 宽度定制
+    width: {
+      type: Number,
+      default: 100
+    },
+    // 高度定制
+    height: {
+      type: Number,
+      default: 60
+    },
+    // 背景颜色定制
+    bg: {
+      type: String,
+      default: '#ccc'
+    }
+  }
+}
+</script>
+<style scoped lang="less">
+.xtx-skeleton {
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+  vertical-align: middle;
+  .block {
+    width: 100%;
+    height: 100%;
+    border-radius: 2px;
+  }
+}
+.shan {
+  &::after {
+    content: "";
+    position: absolute;
+    animation: shan 1.5s ease 0s infinite;
+    top: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      to left,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.3) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    transform: skewX(-45deg);
+  }
+}
+@keyframes shan {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 120%;
+  }
+}
+</style>
+
+```
+
+2）在数据处使用v-if进行判断数据未请求到时展示骨架
+
+```vue
+<template v-if="list.length > 0">
+      <li v-for="item in list" :key="item.id">
+        <RouterLink :to="'/category/' + item.id">{{ item.name }}</RouterLink>
+      </li>
+</template>
+    
+<template v-else>
+      <li v-for="i in 9" :key="i">
+        <Skeleton
+          :width="60"
+          :height="32"
+          style="margin-right: 5px"
+          bg="rgba(0,0,0,0.5)"
+        />
+      </li>
+```
+
+## 面包屑组件封装
+
+**封装两个组件**：面包屑组件与面包屑项目组件
+
+`面包屑组件`
+
+- 接受一个值：面包屑的分隔符
+- 有一个默认插槽
+- 将分隔符传出，可供项目组件使用
+
+```vue
+<template>
+  <div class="xtx-bread">
+    <slot />
+  </div>
+</template>
+
+<script>
+// 分隔符数据是位于Bread组件中 而对于分隔符数据的使用是在底层的组件中使用
+// provide/inject
+import { provide } from 'vue'
+export default {
+  name: 'XtxBread',
+  props: {
+    separator: {
+      type: String,
+      default: ''
+    }
+  },
+  setup (props) {
+    // 为底层组件提供数据
+    provide('separator', props.separator)
+  }
+}
+</script>
+
+<style scoped lang="less">
+.xtx-bread {
+  display: flex;
+  padding: 25px 10px;
+  &-item {
+    a {
+      color: #666;
+      transition: all 0.4s;
+      &:hover {
+        color: @xtxColor;
+      }
+    }
+  }
+  i {
+    font-size: 12px;
+    margin-left: 5px;
+    margin-right: 5px;
+    line-height: 22px;
+  }
+}
+</style>
+```
+
+`面包屑项目组件`
+
+- 接收一个值：to 用作路由跳转
+
+- 有一个默认插槽放文字
+- 判断如果to存在渲染路由链接标签，否则渲染一个span标签
+- 接收面包屑组件的分隔符，如没有用默认的
+
+```vue
+<template>
+  <div class="xtx-bread-item">
+    <!--
+      如果to存在 有值 我们就渲染一个router-link标签
+      如果to不存在  那就渲染一个span标签
+     -->
+    <router-link v-if="to" :to="to"><slot /></router-link>
+    <span v-else><slot /></span>
+    <!-- 分隔符 -->
+    <i v-if="separator">{{ separator }}</i>
+    <i v-else class="iconfont icon-angle-right"></i>
+  </div>
+</template>
+
+<script>
+import { inject } from 'vue'
+export default {
+  name: 'XtxBreadItem',
+  props: {
+    to: {
+      type: String
+    }
+  },
+  setup () {
+    const separator = inject('separator')
+    return {
+      separator
+    }
+  }
+}
+</script>
+<style lang="less" scoped>
+.xtx-bread-item {
+  i {
+    margin: 0 6px;
+    font-size: 10px;
+  }
+  // 最后一个i隐藏
+  &:nth-last-of-type(1) {
+    i {
+      display: none;
+    }
+  }
+}
+</style>
+
+```
+
+**应用**：
+
+```vue
+<XtxBread>
+  <XtxBreadItem to="/">首页</XtxBreadItem>
+  <XtxBreadItem>美食</XtxBreadItem>
+</XtxBread>
 ```
 
